@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2012 Joel Martin
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -10,11 +10,11 @@
  * Cross-browser event and position routines
  */
 
-export function getPointerEvent (e) {
+export function getPointerEvent(e) {
     return e.changedTouches ? e.changedTouches[0] : e.touches ? e.touches[0] : e;
 }
 
-export function stopEvent (e) {
+export function stopEvent(e) {
     e.stopPropagation();
     e.preventDefault();
 }
@@ -57,7 +57,7 @@ const _captureObserver = new MutationObserver(_captureElemChanged);
 
 let _captureIndex = 0;
 
-export function setCapture (elem) {
+export function setCapture(elem) {
     if (elem.setCapture) {
 
         elem.setCapture();
@@ -96,7 +96,7 @@ export function setCapture (elem) {
         _captureIndex++;
 
         // Track cursor and get initial cursor
-        _captureObserver.observe(elem, {attributes:true});
+        _captureObserver.observe(elem, {attributes: true});
         _captureElemChanged();
 
         captureElem.style.display = "";
@@ -108,7 +108,7 @@ export function setCapture (elem) {
     }
 }
 
-export function releaseCapture () {
+export function releaseCapture() {
     if (document.releaseCapture) {
 
         document.releaseCapture();
@@ -120,7 +120,7 @@ export function releaseCapture () {
 
         // There might be events already queued, so we need to wait for
         // them to flush. E.g. contextmenu in Microsoft Edge
-        window.setTimeout(function(expected) {
+        window.setTimeout((expected) => {
             // Only clear it if it's the expected grab (i.e. no one
             // else has initiated a new grab)
             if (_captureIndex === expected) {

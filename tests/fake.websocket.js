@@ -12,34 +12,34 @@ function make_event(name, props) {
     return evt;
 }
 
-export default function FakeWebSocket (uri, protocols) {
-    this.url = uri;
-    this.binaryType = "arraybuffer";
-    this.extensions = "";
+export default class FakeWebSocket {
+    constructor(uri, protocols) {
+        this.url = uri;
+        this.binaryType = "arraybuffer";
+        this.extensions = "";
 
-    if (!protocols || typeof protocols === 'string') {
-        this.protocol = protocols;
-    } else {
-        this.protocol = protocols[0];
+        if (!protocols || typeof protocols === 'string') {
+            this.protocol = protocols;
+        } else {
+            this.protocol = protocols[0];
+        }
+
+        this._send_queue = new Uint8Array(20000);
+
+        this.readyState = FakeWebSocket.CONNECTING;
+        this.bufferedAmount = 0;
+
+        this.__is_fake = true;
     }
 
-    this._send_queue = new Uint8Array(20000);
-
-    this.readyState = FakeWebSocket.CONNECTING;
-    this.bufferedAmount = 0;
-
-    this.__is_fake = true;
-}
-
-FakeWebSocket.prototype = {
-    close: function (code, reason) {
+    close(code, reason) {
         this.readyState = FakeWebSocket.CLOSED;
         if (this.onclose) {
             this.onclose(make_event("close", { 'code': code, 'reason': reason, 'wasClean': true }));
         }
-    },
+    }
 
-    send: function (data) {
+    send(data) {
         if (this.protocol == 'base64') {
             data = Base64.decode(data);
         } else {
@@ -47,25 +47,30 @@ FakeWebSocket.prototype = {
         }
         this._send_queue.set(data, this.bufferedAmount);
         this.bufferedAmount += data.length;
-    },
+    }
 
-    _get_sent_data: function () {
+    _get_sent_data() {
         const res = new Uint8Array(this._send_queue.buffer, 0, this.bufferedAmount);
         this.bufferedAmount = 0;
         return res;
-    },
+    }
 
-    _open: function (data) {
+    _open() {
         this.readyState = FakeWebSocket.OPEN;
         if (this.onopen) {
             this.onopen(make_event('open'));
         }
-    },
-
-    _receive_data: function (data) {
-        this.onmessage(make_event("message", { 'data': data }));
     }
-};
+
+    _receive_data(data) {
+        // Break apart the data to expose bugs where we assume data is
+        // neatly packaged
+        for (let i = 0;i < data.length;i++) {
+            let buf = data.subarray(i, i+1);
+            this.onmessage(make_event("message", { 'data': buf }));
+        }
+    }
+}
 
 FakeWebSocket.OPEN = WebSocket.OPEN;
 FakeWebSocket.CONNECTING = WebSocket.CONNECTING;
@@ -74,7 +79,7 @@ FakeWebSocket.CLOSED = WebSocket.CLOSED;
 
 FakeWebSocket.__is_fake = true;
 
-FakeWebSocket.replace = function () {
+FakeWebSocket.replace = () => {
     if (!WebSocket.__is_fake) {
         const real_version = WebSocket;
         // eslint-disable-next-line no-global-assign
@@ -83,7 +88,7 @@ FakeWebSocket.replace = function () {
     }
 };
 
-FakeWebSocket.restore = function () {
+FakeWebSocket.restore = () => {
     if (WebSocket.__is_fake) {
         // eslint-disable-next-line no-global-assign
         WebSocket = WebSocket.__real_version;

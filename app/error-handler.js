@@ -2,11 +2,14 @@
 // native support in the browsers, so that our error handler
 // can catch script-loading errors.
 
-(function(){
+// No ES6 can be used in this file since it's used for the translation
+/* eslint-disable prefer-arrow-callback */
+
+(function _scope() {
     "use strict";
 
     // Fallback for all uncought errors
-    function handleError (event, err) {
+    function handleError(event, err) {
         try {
             const msg = document.getElementById('noVNC_fallback_errormsg');
 
@@ -50,6 +53,6 @@
         // from being printed to the browser console.
         return false;
     }
-    window.addEventListener('error', function (evt) { handleError(evt, evt.error); });
-    window.addEventListener('unhandledrejection', function (evt) { handleError(evt.reason, evt.reason); });
+    window.addEventListener('error', function onerror(evt) { handleError(evt, evt.error); });
+    window.addEventListener('unhandledrejection', function onreject(evt) { handleError(evt.reason, evt.reason); });
 })();

@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2012 Joel Martin
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -10,17 +10,17 @@
  * Localization Utilities
  */
 
-export function Localizer() {
-    // Currently configured language
-    this.language = 'en';
+export class Localizer {
+    constructor() {
+        // Currently configured language
+        this.language = 'en';
 
-    // Current dictionary of translations
-    this.dictionary = undefined;
-}
+        // Current dictionary of translations
+        this.dictionary = undefined;
+    }
 
-Localizer.prototype = {
     // Configure suitable language based on user preferences
-    setup: function (supportedLanguages) {
+    setup(supportedLanguages) {
         this.language = 'en'; // Default: US English
 
         /*
@@ -53,10 +53,12 @@ Localizer.prototype = {
                     .replace("_", "-")
                     .split("-");
 
-                if (userLang[0] !== supLang[0])
+                if (userLang[0] !== supLang[0]) {
                     continue;
-                if (userLang[1] !== supLang[1])
+                }
+                if (userLang[1] !== supLang[1]) {
                     continue;
+                }
 
                 this.language = supportedLanguages[j];
                 return;
@@ -69,30 +71,33 @@ Localizer.prototype = {
                     .replace("_", "-")
                     .split("-");
 
-                if (userLang[0] !== supLang[0])
+                if (userLang[0] !== supLang[0]) {
                     continue;
-                if (supLang[1] !== undefined)
+                }
+                if (supLang[1] !== undefined) {
                     continue;
+                }
 
                 this.language = supportedLanguages[j];
                 return;
             }
         }
-    },
+    }
 
     // Retrieve localised text
-    get: function (id) {
+    get(id) {
         if (typeof this.dictionary !== 'undefined' && this.dictionary[id]) {
             return this.dictionary[id];
         } else {
             return id;
         }
-    },
+    }
 
     // Traverses the DOM and translates relevant fields
     // See https://html.spec.whatwg.org/multipage/dom.html#attr-translate
-    translateDOM: function () {
+    translateDOM() {
         const self = this;
+
         function process(elem, enabled) {
             function isAnyOf(searchElement, items) {
                 return items.indexOf(searchElement) !== -1;
@@ -131,7 +136,7 @@ Localizer.prototype = {
                 }
                 if (elem.hasAttribute("label") &&
                     isAnyOf(elem.tagName, ["MENUITEM", "MENU", "OPTGROUP",
-                                   "OPTION", "TRACK"])) {
+                                           "OPTION", "TRACK"])) {
                     translateAttribute(elem, "label");
                 }
                 // FIXME: Should update "lang"
@@ -160,8 +165,8 @@ Localizer.prototype = {
         }
 
         process(document.body, true);
-    },
-};
+    }
+}
 
 export const l10n = new Localizer();
 export default l10n.get.bind(l10n);

@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2017 Pierre Ossman for Cendio AB
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -24,6 +24,7 @@ export const encodings = {
     pseudoEncodingXvp: -309,
     pseudoEncodingFence: -312,
     pseudoEncodingContinuousUpdates: -313,
+    pseudoEncodingReplitAudio: 0x52706c41,
     pseudoEncodingCompressLevel9: -247,
     pseudoEncodingCompressLevel0: -256,
 };

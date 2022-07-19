@@ -53,6 +53,17 @@ protocol stream.
     should be sent whenever the container changes dimensions. Disabled
     by default.
 
+`showDotCursor`
+  - Is a `boolean` indicating whether a dot cursor should be shown
+    instead of a zero-sized or fully-transparent cursor if the server
+    sets such invisible cursor. Disabled by default.
+
+`background`
+  - Is a valid CSS [background](https://developer.mozilla.org/en-US/docs/Web/CSS/background)
+    style value indicating which background style should be applied
+    to the element containing the remote session screen. The default value is `rgb(40, 40, 40)`
+    (solid gray color).
+
 `capabilities` *Read only*
   - Is an `Object` indicating which optional extensions are available
     on the server. Some methods may only be called if the corresponding

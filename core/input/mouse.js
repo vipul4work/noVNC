@@ -1,7 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2012 Joel Martin
- * Copyright (C) 2013 Samuel Mannehed for Cendio AB
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 or any later version (see LICENSE.txt)
  */
 
@@ -13,44 +12,44 @@ const WHEEL_STEP = 10; // Delta threshold for a mouse wheel step
 const WHEEL_STEP_TIMEOUT = 50; // ms
 const WHEEL_LINE_HEIGHT = 19;
 
-export default function Mouse(target) {
-    this._target = target || document;
+export default class Mouse {
+    constructor(target) {
+        this._target = target || document;
 
-    this._doubleClickTimer = null;
-    this._lastTouchPos = null;
+        this._doubleClickTimer = null;
+        this._lastTouchPos = null;
 
-    this._pos = null;
-    this._wheelStepXTimer = null;
-    this._wheelStepYTimer = null;
-    this._accumulatedWheelDeltaX = 0;
-    this._accumulatedWheelDeltaY = 0;
+        this._pos = null;
+        this._wheelStepXTimer = null;
+        this._wheelStepYTimer = null;
+        this._accumulatedWheelDeltaX = 0;
+        this._accumulatedWheelDeltaY = 0;
 
-    this._eventHandlers = {
-        'mousedown': this._handleMouseDown.bind(this),
-        'mouseup': this._handleMouseUp.bind(this),
-        'mousemove': this._handleMouseMove.bind(this),
-        'mousewheel': this._handleMouseWheel.bind(this),
-        'mousedisable': this._handleMouseDisable.bind(this)
-    };
-}
+        this._eventHandlers = {
+            'mousedown': this._handleMouseDown.bind(this),
+            'mouseup': this._handleMouseUp.bind(this),
+            'mousemove': this._handleMouseMove.bind(this),
+            'mousewheel': this._handleMouseWheel.bind(this),
+            'mousedisable': this._handleMouseDisable.bind(this)
+        };
 
-Mouse.prototype = {
-    // ===== PROPERTIES =====
+        // ===== PROPERTIES =====
 
-    touchButton: 1,                 // Button mask (1, 2, 4) for touch devices (0 means ignore clicks)
+        this.touchButton = 1;                 // Button mask (1, 2, 4) for touch devices (0 means ignore clicks)
 
-    // ===== EVENT HANDLERS =====
+        // ===== EVENT HANDLERS =====
 
-    onmousebutton: function () {},  // Handler for mouse button click/release
-    onmousemove: function () {},    // Handler for mouse movement
+        this.onmousebutton = () => {}; // Handler for mouse button click/release
+        this.onmousemove = () => {}; // Handler for mouse movement
+    }
 
     // ===== PRIVATE METHODS =====
 
-    _resetDoubleClickTimer: function () {
+    _resetDoubleClickTimer() {
         this._doubleClickTimer = null;
-    },
+    }
 
-    _handleMouseButton: function (e, down) {
+    _handleMouseButton(e, down) {
         this._updateMousePosition(e);
         let pos = this._pos;
 
@@ -100,25 +99,25 @@ Mouse.prototype = {
         this.onmousebutton(pos.x, pos.y, down, bmask);
 
         stopEvent(e);
-    },
+    }
 
-    _handleMouseDown: function (e) {
+    _handleMouseDown(e) {
         // Touch events have implicit capture
         if (e.type === "mousedown") {
             setCapture(this._target);
         }
 
         this._handleMouseButton(e, 1);
-    },
+    }
 
-    _handleMouseUp: function (e) {
+    _handleMouseUp(e) {
         this._handleMouseButton(e, 0);
-    },
+    }
 
     // Mouse wheel events are sent in steps over VNC. This means that the VNC
     // protocol can't handle a wheel event with specific distance or speed.
     // Therefor, if we get a lot of small mouse wheel events we combine them.
-    _generateWheelStepX: function () {
+    _generateWheelStepX() {
 
         if (this._accumulatedWheelDeltaX < 0) {
             this.onmousebutton(this._pos.x, this._pos.y, 1, 1 << 5);
@@ -129,9 +128,9 @@ Mouse.prototype = {
         }
 
         this._accumulatedWheelDeltaX = 0;
-    },
+    }
 
-    _generateWheelStepY: function () {
+    _generateWheelStepY() {
 
         if (this._accumulatedWheelDeltaY < 0) {
             this.onmousebutton(this._pos.x, this._pos.y, 1, 1 << 3);
@@ -142,16 +141,16 @@ Mouse.prototype = {
         }
 
         this._accumulatedWheelDeltaY = 0;
-    },
+    }
 
-    _resetWheelStepTimers: function () {
+    _resetWheelStepTimers() {
         window.clearTimeout(this._wheelStepXTimer);
         window.clearTimeout(this._wheelStepYTimer);
         this._wheelStepXTimer = null;
         this._wheelStepYTimer = null;
-    },
+    }
 
-    _handleMouseWheel: function (e) {
+    _handleMouseWheel(e) {
         this._resetWheelStepTimers();
 
         this._updateMousePosition(e);
@@ -192,15 +191,15 @@ Mouse.prototype = {
         }
 
         stopEvent(e);
-    },
+    }
 
-    _handleMouseMove: function (e) {
+    _handleMouseMove(e) {
         this._updateMousePosition(e);
         this.onmousemove(this._pos.x, this._pos.y);
         stopEvent(e);
-    },
+    }
 
-    _handleMouseDisable: function (e) {
+    _handleMouseDisable(e) {
         /*
          * Stop propagation if inside canvas area
          * Note: This is only needed for the 'click' event as it fails
@@ -210,10 +209,10 @@ Mouse.prototype = {
         if (e.target == this._target) {
             stopEvent(e);
         }
-    },
+    }
 
     // Update coordinates relative to target
-    _updateMousePosition: function(e) {
+    _updateMousePosition(e) {
         e = getPointerEvent(e);
         const bounds = this._target.getBoundingClientRect();
         let x;
@@ -233,49 +232,45 @@ Mouse.prototype = {
         } else {
             y = e.clientY - bounds.top;
         }
-        this._pos = {x:x, y:y};
-    },
+        this._pos = {x: x, y: y};
+    }
 
     // ===== PUBLIC METHODS =====
 
-    grab: function () {
-        const c = this._target;
-
+    grab() {
         if (isTouchDevice) {
-            c.addEventListener('touchstart', this._eventHandlers.mousedown);
-            c.addEventListener('touchend', this._eventHandlers.mouseup);
-            c.addEventListener('touchmove', this._eventHandlers.mousemove);
+            this._target.addEventListener('touchstart', this._eventHandlers.mousedown);
+            this._target.addEventListener('touchend', this._eventHandlers.mouseup);
+            this._target.addEventListener('touchmove', this._eventHandlers.mousemove);
         }
-        c.addEventListener('mousedown', this._eventHandlers.mousedown);
-        c.addEventListener('mouseup', this._eventHandlers.mouseup);
-        c.addEventListener('mousemove', this._eventHandlers.mousemove);
-        c.addEventListener('wheel', this._eventHandlers.mousewheel);
+        this._target.addEventListener('mousedown', this._eventHandlers.mousedown);
+        this._target.addEventListener('mouseup', this._eventHandlers.mouseup);
+        this._target.addEventListener('mousemove', this._eventHandlers.mousemove);
+        this._target.addEventListener('wheel', this._eventHandlers.mousewheel);
 
         /* Prevent middle-click pasting (see above for why we bind to document) */
         document.addEventListener('click', this._eventHandlers.mousedisable);
 
         /* preventDefault() on mousedown doesn't stop this event for some
            reason so we have to explicitly block it */
-        c.addEventListener('contextmenu', this._eventHandlers.mousedisable);
-    },
+        this._target.addEventListener('contextmenu', this._eventHandlers.mousedisable);
+    }
 
-    ungrab: function () {
-        const c = this._target;
-
+    ungrab() {
         this._resetWheelStepTimers();
 
         if (isTouchDevice) {
-            c.removeEventListener('touchstart', this._eventHandlers.mousedown);
-            c.removeEventListener('touchend', this._eventHandlers.mouseup);
-            c.removeEventListener('touchmove', this._eventHandlers.mousemove);
+            this._target.removeEventListener('touchstart', this._eventHandlers.mousedown);
+            this._target.removeEventListener('touchend', this._eventHandlers.mouseup);
+            this._target.removeEventListener('touchmove', this._eventHandlers.mousemove);
         }
-        c.removeEventListener('mousedown', this._eventHandlers.mousedown);
-        c.removeEventListener('mouseup', this._eventHandlers.mouseup);
-        c.removeEventListener('mousemove', this._eventHandlers.mousemove);
-        c.removeEventListener('wheel', this._eventHandlers.mousewheel);
+        this._target.removeEventListener('mousedown', this._eventHandlers.mousedown);
+        this._target.removeEventListener('mouseup', this._eventHandlers.mouseup);
+        this._target.removeEventListener('mousemove', this._eventHandlers.mousemove);
+        this._target.removeEventListener('wheel', this._eventHandlers.mousewheel);
 
         document.removeEventListener('click', this._eventHandlers.mousedisable);
 
-        c.removeEventListener('contextmenu', this._eventHandlers.mousedisable);
+        this._target.removeEventListener('contextmenu', this._eventHandlers.mousedisable);
     }
-};
+}

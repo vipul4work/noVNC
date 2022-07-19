@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2012 Joel Martin
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -20,32 +20,60 @@ window.addEventListener('touchstart', function onFirstTouch() {
     window.removeEventListener('touchstart', onFirstTouch, false);
 }, false);
 
-let _cursor_uris_supported = null;
 
-export function supportsCursorURIs () {
-    if (_cursor_uris_supported === null) {
-        try {
-            const target = document.createElement('canvas');
-            target.style.cursor = 'url("data:image/x-icon;base64,AAACAAEACAgAAAIAAgA4AQAAFgAAACgAAAAIAAAAEAAAAAEAIAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAD/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAA==") 2 2, default';
+// The goal is to find a certain physical width, the devicePixelRatio
+// brings us a bit closer but is not optimal.
+export let dragThreshold = 10 * (window.devicePixelRatio || 1);
 
-            if (target.style.cursor) {
-                Log.Info("Data URI scheme cursor supported");
-                _cursor_uris_supported = true;
-            } else {
-                Log.Warn("Data URI scheme cursor not supported");
-                _cursor_uris_supported = false;
-            }
-        } catch (exc) {
-            Log.Error("Data URI scheme cursor test exception: " + exc);
-            _cursor_uris_supported = false;
-        }
+let _supportsCursorURIs = false;
+
+try {
+    const target = document.createElement('canvas');
+    target.style.cursor = 'url("data:image/x-icon;base64,AAACAAEACAgAAAIAAgA4AQAAFgAAACgAAAAIAAAAEAAAAAEAIAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAD/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////AAAAAAAAAAAAAAAAAAAAAA==") 2 2, default';
+
+    if (target.style.cursor) {
+        Log.Info("Data URI scheme cursor supported");
+        _supportsCursorURIs = true;
+    } else {
+        Log.Warn("Data URI scheme cursor not supported");
     }
-
-    return _cursor_uris_supported;
+} catch (exc) {
+    Log.Error("Data URI scheme cursor test exception: " + exc);
 }
+
+export const supportsCursorURIs = _supportsCursorURIs;
+
+let _supportsImageMetadata = false;
+try {
+    new ImageData(new Uint8ClampedArray(4), 1, 1);
+    _supportsImageMetadata = true;
+} catch (ex) {
+    // ignore failure
+}
+export const supportsImageMetadata = _supportsImageMetadata;
 
 export function isMac() {
     return navigator && !!(/mac/i).exec(navigator.platform);
+}
+
+export function isWindows() {
+    return navigator && !!(/win/i).exec(navigator.platform);
+}
+
+export function isIOS() {
+    return navigator &&
+           (!!(/ipad/i).exec(navigator.platform) ||
+            !!(/iphone/i).exec(navigator.platform) ||
+            !!(/ipod/i).exec(navigator.platform));
+}
+
+export function isAndroid() {
+    return navigator && !!(/android/i).exec(navigator.userAgent);
+}
+
+export function isSafari() {
+    return navigator && (navigator.userAgent.indexOf('Safari') !== -1 &&
+                         navigator.userAgent.indexOf('Chrome') === -1);
 }
 
 export function isIE() {
@@ -58,16 +86,5 @@ export function isEdge() {
 
 export function isFirefox() {
     return navigator && !!(/firefox/i).exec(navigator.userAgent);
-}
-
-export function isWindows() {
-    return navigator && !!(/win/i).exec(navigator.platform);
-}
-
-export function isIOS() {
-    return navigator &&
-           (!!(/ipad/i).exec(navigator.platform) ||
-            !!(/iphone/i).exec(navigator.platform) ||
-            !!(/ipod/i).exec(navigator.platform));
 }
 
