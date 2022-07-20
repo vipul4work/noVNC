@@ -1,10 +1,9 @@
 // Karma configuration
 
-module.exports = function(config) {
+module.exports = (config) => {
   const customLaunchers = {};
   let browsers = [];
   let useSauce = false;
-  let transpileToES5 = ['internet explorer'].includes(process.env.TEST_BROWSER_NAME);
 
   // use Sauce when running on Travis
   if (process.env.TRAVIS_JOB_NUMBER) {
@@ -20,9 +19,6 @@ module.exports = function(config) {
 
     for (let i = 0; i < names.length; i++) {
       for (let j = 0; j < platforms.length; j++) {
-        // FIXME Skip tests in Linux since Sauce Labs browser versions are ancient.
-        // https://github.com/novnc/noVNC/pull/1013#issuecomment-382749805
-        if (platforms[j] === 'Linux') continue;
         for (let k = 0; k < versions.length; k++) {
           let launcher_name = 'sl_' + platforms[j].replace(/[^a-zA-Z0-9]/g, '') + '_' + names[i];
           if (versions[k]) {
@@ -56,19 +52,19 @@ module.exports = function(config) {
 
     // frameworks to use
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
-    frameworks: ['requirejs', 'mocha', 'chai'],
+    frameworks: ['mocha', 'sinon-chai'],
 
     // list of files / patterns to load in the browser (loaded in order)
     files: [
-      { pattern: 'vendor/sinon.js', included: false },
-      { pattern: 'node_modules/sinon-chai/lib/sinon-chai.js', included: false },
       { pattern: 'app/localization.js', included: false },
       { pattern: 'app/webutil.js', included: false },
       { pattern: 'core/**/*.js', included: false },
       { pattern: 'vendor/pako/**/*.js', included: false },
+      { pattern: 'vendor/browser-es-module-loader/dist/*.js*', included: false },
       { pattern: 'tests/test.*.js', included: false },
       { pattern: 'tests/fake.*.js', included: false },
       { pattern: 'tests/assertions.js', included: false },
+      'vendor/promise.js',
       'tests/karma-test-main.js',
     ],
 
@@ -89,26 +85,6 @@ module.exports = function(config) {
     // start these browsers
     // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
     browsers: browsers,
-
-    // preprocess matching files before serving them to the browser
-    // available preprocessors: https://npmjs.org/browse/keyword/karma-preprocessor
-    preprocessors: {
-      'app/localization.js': ['babel'],
-      'app/webutil.js': ['babel'],
-      'core/**/*.js': ['babel'],
-      'tests/test.*.js': ['babel'],
-      'tests/fake.*.js': ['babel'],
-      'tests/assertions.js': ['babel'],
-      'vendor/pako/**/*.js': ['babel'],
-    },
-
-    babelPreprocessor: {
-      options: {
-        presets: transpileToES5 ? ['es2015'] : [],
-        plugins: ['transform-es2015-modules-amd', 'syntax-dynamic-import'],
-        sourceMap: 'inline',
-      },
-    },
 
     // test results reporter to use
     // possible values: 'dots', 'progress'
@@ -141,7 +117,7 @@ module.exports = function(config) {
     captureTimeout: 240000,
 
     // similarly to above
-    browserNoActivityTimeout: 100000,
+    browserNoActivityTimeout: 300000,
   };
 
   if (useSauce) {

@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2012 Joel Martin
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -12,19 +12,19 @@
 
 let _log_level = 'warn';
 
-let Debug = function (msg) {};
-let Info = function (msg) {};
-let Warn = function (msg) {};
-let Error = function (msg) {};
+let Debug = () => {};
+let Info = () => {};
+let Warn = () => {};
+let Error = () => {};
 
-export function init_logging (level) {
+export function init_logging(level) {
     if (typeof level === 'undefined') {
         level = _log_level;
     } else {
         _log_level = level;
     }
 
-    Debug = Info = Warn = Error = function (msg) {};
+    Debug = Info = Warn = Error = () => {};
 
     if (typeof window.console !== "undefined") {
         /* eslint-disable no-console, no-fallthrough */
@@ -40,13 +40,13 @@ export function init_logging (level) {
             case 'none':
                 break;
             default:
-                throw new Error("invalid logging type '" + level + "'");
+                throw new window.Error("invalid logging type '" + level + "'");
         }
         /* eslint-enable no-console, no-fallthrough */
     }
 }
 
-export function get_logging () {
+export function get_logging() {
     return _log_level;
 }
 

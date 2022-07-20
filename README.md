@@ -67,6 +67,7 @@ Please tweet [@noVNC](http://www.twitter.com/noVNC) if you do.
 * Supports scaling, clipping and resizing the desktop
 * Local cursor rendering
 * Clipboard copy/paste
+* Translations
 * Licensed mainly under the [MPL 2.0](http://www.mozilla.org/MPL/2.0/), see
   [the license document](LICENSE.txt) for details
 
@@ -125,6 +126,9 @@ or deploying the noVNC application in production environments:
 
 
 ### Authors/Contributors
+
+See [AUTHORS](AUTHORS) for a (full-ish) list of authors.  If you're not on
+that list and you think you should be, feel free to send a PR to fix that.
 
 * Core team:
     * [Joel Martin](https://github.com/kanaka)

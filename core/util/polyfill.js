@@ -1,6 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright 2017 Pierre Ossman for noVNC
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 or any later version (see LICENSE.txt)
  */
 
@@ -38,8 +38,8 @@ if (typeof Object.assign != 'function') {
 }
 
 /* CustomEvent constructor (taken from MDN) */
-(function () {
-    function CustomEvent ( event, params ) {
+(() => {
+    function CustomEvent(event, params) {
         params = params || { bubbles: false, cancelable: false, detail: undefined };
         const evt = document.createEvent( 'CustomEvent' );
         evt.initCustomEvent( event, params.bubbles, params.cancelable, params.detail );

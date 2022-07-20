@@ -1,7 +1,6 @@
 /*
  * noVNC: HTML5 VNC client
- * Copyright (C) 2012 Joel Martin
- * Copyright (C) 2015 Samuel Mannehed for Cendio AB
+ * Copyright (C) 2018 The noVNC Authors
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for usage and integration instructions.
@@ -9,110 +8,106 @@
 
 import * as Log from './util/logging.js';
 import Base64 from "./base64.js";
+import { supportsImageMetadata } from './util/browser.js';
 
-export default function Display(target) {
-    this._drawCtx = null;
-    this._c_forceCanvas = false;
+export default class Display {
+    constructor(target) {
+        this._drawCtx = null;
+        this._c_forceCanvas = false;
 
-    this._renderQ = [];  // queue drawing actions for in-oder rendering
-    this._flushing = false;
+        this._renderQ = [];  // queue drawing actions for in-oder rendering
+        this._flushing = false;
 
-    // the full frame buffer (logical canvas) size
-    this._fb_width = 0;
-    this._fb_height = 0;
+        // the full frame buffer (logical canvas) size
+        this._fb_width = 0;
+        this._fb_height = 0;
 
-    this._prevDrawStyle = "";
-    this._tile = null;
-    this._tile16x16 = null;
-    this._tile_x = 0;
-    this._tile_y = 0;
+        this._prevDrawStyle = "";
+        this._tile = null;
+        this._tile16x16 = null;
+        this._tile_x = 0;
+        this._tile_y = 0;
 
-    Log.Debug(">> Display.constructor");
+        Log.Debug(">> Display.constructor");
 
-    // The visible canvas
-    this._target = target;
+        // The visible canvas
+        this._target = target;
 
-    if (!this._target) {
-        throw new Error("Target must be set");
+        if (!this._target) {
+            throw new Error("Target must be set");
+        }
+
+        if (typeof this._target === 'string') {
+            throw new Error('target must be a DOM element');
+        }
+
+        if (!this._target.getContext) {
+            throw new Error("no getContext method");
+        }
+
+        this._targetCtx = this._target.getContext('2d');
+
+        // the visible canvas viewport (i.e. what actually gets seen)
+        this._viewportLoc = { 'x': 0, 'y': 0, 'w': this._target.width, 'h': this._target.height };
+
+        // The hidden canvas, where we do the actual rendering
+        this._backbuffer = document.createElement('canvas');
+        this._drawCtx = this._backbuffer.getContext('2d');
+
+        this._damageBounds = { left: 0, top: 0,
+                               right: this._backbuffer.width,
+                               bottom: this._backbuffer.height };
+
+        Log.Debug("User Agent: " + navigator.userAgent);
+
+        this.clear();
+
+        // Check canvas features
+        if (!('createImageData' in this._drawCtx)) {
+            throw new Error("Canvas does not support createImageData");
+        }
+
+        this._tile16x16 = this._drawCtx.createImageData(16, 16);
+        Log.Debug("<< Display.constructor");
+
+        // ===== PROPERTIES =====
+
+        this._scale = 1.0;
+        this._clipViewport = false;
+        this.logo = null;
+
+        // ===== EVENT HANDLERS =====
+
+        this.onflush = () => {}; // A flush request has finished
     }
 
-    if (typeof this._target === 'string') {
-        throw new Error('target must be a DOM element');
-    }
-
-    if (!this._target.getContext) {
-        throw new Error("no getContext method");
-    }
-
-    this._targetCtx = this._target.getContext('2d');
-
-    // the visible canvas viewport (i.e. what actually gets seen)
-    this._viewportLoc = { 'x': 0, 'y': 0, 'w': this._target.width, 'h': this._target.height };
-
-    // The hidden canvas, where we do the actual rendering
-    this._backbuffer = document.createElement('canvas');
-    this._drawCtx = this._backbuffer.getContext('2d');
-
-    this._damageBounds = { left:0, top:0,
-                           right: this._backbuffer.width,
-                           bottom: this._backbuffer.height };
-
-    Log.Debug("User Agent: " + navigator.userAgent);
-
-    this.clear();
-
-    // Check canvas features
-    if (!('createImageData' in this._drawCtx)) {
-        throw new Error("Canvas does not support createImageData");
-    }
-
-    this._tile16x16 = this._drawCtx.createImageData(16, 16);
-    Log.Debug("<< Display.constructor");
-}
-
-let SUPPORTS_IMAGEDATA_CONSTRUCTOR = false;
-try {
-    new ImageData(new Uint8ClampedArray(4), 1, 1);
-    SUPPORTS_IMAGEDATA_CONSTRUCTOR = true;
-} catch (ex) {
-    // ignore failure
-}
-
-Display.prototype = {
     // ===== PROPERTIES =====
 
-    _scale: 1.0,
-    get scale() { return this._scale; },
+    get scale() { return this._scale; }
     set scale(scale) {
         this._rescale(scale);
-    },
+    }
 
-    _clipViewport: false,
-    get clipViewport() { return this._clipViewport; },
+    get clipViewport() { return this._clipViewport; }
     set clipViewport(viewport) {
         this._clipViewport = viewport;
         // May need to readjust the viewport dimensions
         const vp = this._viewportLoc;
         this.viewportChangeSize(vp.w, vp.h);
         this.viewportChangePos(0, 0);
-    },
+    }
 
     get width() {
         return this._fb_width;
-    },
+    }
+
     get height() {
         return this._fb_height;
-    },
-
-    logo: null,
-
-    // ===== EVENT HANDLERS =====
-
-    onflush: function () {},        // A flush request has finished
+    }
 
     // ===== PUBLIC METHODS =====
 
-    viewportChangePos: function (deltaX, deltaY) {
+    viewportChangePos(deltaX, deltaY) {
         const vp = this._viewportLoc;
         deltaX = Math.floor(deltaX);
         deltaY = Math.floor(deltaY);
@@ -152,9 +147,9 @@ Display.prototype = {
         this._damage(vp.x, vp.y, vp.w, vp.h);
 
         this.flip();
-    },
+    }
 
-    viewportChangeSize: function(width, height) {
+    viewportChangeSize(width, height) {
 
         if (!this._clipViewport ||
             typeof(width) === "undefined" ||
@@ -164,6 +159,9 @@ Display.prototype = {
             width = this._fb_width;
             height = this._fb_height;
         }
+
+        width = Math.floor(width);
+        height = Math.floor(height);
 
         if (width > this._fb_width) {
             width = this._fb_width;
@@ -190,17 +188,23 @@ Display.prototype = {
             // Update the visible size of the target canvas
             this._rescale(this._scale);
         }
-    },
+    }
 
-    absX: function (x) {
+    absX(x) {
+        if (this._scale === 0) {
+            return 0;
+        }
         return x / this._scale + this._viewportLoc.x;
-    },
+    }
 
-    absY: function (y) {
+    absY(y) {
+        if (this._scale === 0) {
+            return 0;
+        }
         return y / this._scale + this._viewportLoc.y;
-    },
+    }
 
-    resize: function (width, height) {
+    resize(width, height) {
         this._prevDrawStyle = "";
 
         this._fb_width = width;
@@ -232,10 +236,10 @@ Display.prototype = {
         const vp = this._viewportLoc;
         this.viewportChangeSize(vp.w, vp.h);
         this.viewportChangePos(0, 0);
-    },
+    }
 
     // Track what parts of the visible canvas that need updating
-    _damage: function(x, y, w, h) {
+    _damage(x, y, w, h) {
         if (x < this._damageBounds.left) {
             this._damageBounds.left = x;
         }
@@ -248,11 +252,11 @@ Display.prototype = {
         if ((y + h) > this._damageBounds.bottom) {
             this._damageBounds.bottom = y + h;
         }
-    },
+    }
 
     // Update the visible canvas with the contents of the
     // rendering canvas
-    flip: function(from_queue) {
+    flip(from_queue) {
         if (this._renderQ.length !== 0 && !from_queue) {
             this._renderQ_push({
                 'type': 'flip'
@@ -296,9 +300,9 @@ Display.prototype = {
             this._damageBounds.left = this._damageBounds.top = 65535;
             this._damageBounds.right = this._damageBounds.bottom = 0;
         }
-    },
+    }
 
-    clear: function () {
+    clear() {
         if (this._logo) {
             this.resize(this._logo.width, this._logo.height);
             this.imageRect(0, 0, this._logo.type, this._logo.data);
@@ -307,21 +311,21 @@ Display.prototype = {
             this._drawCtx.clearRect(0, 0, this._fb_width, this._fb_height);
         }
         this.flip();
-    },
+    }
 
-    pending: function() {
+    pending() {
         return this._renderQ.length > 0;
-    },
+    }
 
-    flush: function() {
+    flush() {
         if (this._renderQ.length === 0) {
             this.onflush();
         } else {
             this._flushing = true;
         }
-    },
+    }
 
-    fillRect: function (x, y, width, height, color, from_queue) {
+    fillRect(x, y, width, height, color, from_queue) {
         if (this._renderQ.length !== 0 && !from_queue) {
             this._renderQ_push({
                 'type': 'fill',
@@ -336,9 +340,9 @@ Display.prototype = {
             this._drawCtx.fillRect(x, y, width, height);
             this._damage(x, y, width, height);
         }
-    },
+    }
 
-    copyImage: function (old_x, old_y, new_x, new_y, w, h, from_queue) {
+    copyImage(old_x, old_y, new_x, new_y, w, h, from_queue) {
         if (this._renderQ.length !== 0 && !from_queue) {
             this._renderQ_push({
                 'type': 'copy',
@@ -367,9 +371,9 @@ Display.prototype = {
                                     new_x, new_y, w, h);
             this._damage(new_x, new_y, w, h);
         }
-    },
+    }
 
-    imageRect: function(x, y, mime, arr) {
+    imageRect(x, y, mime, arr) {
         const img = new Image();
         img.src = "data: " + mime + ";base64," + Base64.encode(arr);
         this._renderQ_push({
@@ -378,10 +382,10 @@ Display.prototype = {
             'x': x,
             'y': y
         });
-    },
+    }
 
     // start updating a tile
-    startTile: function (x, y, width, height, color) {
+    startTile(x, y, width, height, color) {
         this._tile_x = x;
         this._tile_y = y;
         if (width === 16 && height === 16) {
@@ -401,10 +405,10 @@ Display.prototype = {
             data[i + 2] = blue;
             data[i + 3] = 255;
         }
-    },
+    }
 
     // update sub-rectangle of the current tile
-    subTile: function (x, y, w, h, color) {
+    subTile(x, y, w, h, color) {
         const red = color[2];
         const green = color[1];
         const blue = color[0];
@@ -422,16 +426,16 @@ Display.prototype = {
                 data[p + 3] = 255;
             }
         }
-    },
+    }
 
     // draw the current tile to the screen
-    finishTile: function () {
+    finishTile() {
         this._drawCtx.putImageData(this._tile, this._tile_x, this._tile_y);
         this._damage(this._tile_x, this._tile_y,
                      this._tile.width, this._tile.height);
-    },
+    }
 
-    blitImage: function (x, y, width, height, arr, offset, from_queue) {
+    blitImage(x, y, width, height, arr, offset, from_queue) {
         if (this._renderQ.length !== 0 && !from_queue) {
             // NB(directxman12): it's technically more performant here to use preallocated arrays,
             // but it's a lot of extra work for not a lot of payoff -- if we're using the render queue,
@@ -449,9 +453,9 @@ Display.prototype = {
         } else {
             this._bgrxImageData(x, y, width, height, arr, offset);
         }
-    },
+    }
 
-    blitRgbImage: function (x, y , width, height, arr, offset, from_queue) {
+    blitRgbImage(x, y, width, height, arr, offset, from_queue) {
         if (this._renderQ.length !== 0 && !from_queue) {
             // NB(directxman12): it's technically more performant here to use preallocated arrays,
             // but it's a lot of extra work for not a lot of payoff -- if we're using the render queue,
@@ -469,9 +473,9 @@ Display.prototype = {
         } else {
             this._rgbImageData(x, y, width, height, arr, offset);
         }
-    },
+    }
 
-    blitRgbxImage: function (x, y, width, height, arr, offset, from_queue) {
+    blitRgbxImage(x, y, width, height, arr, offset, from_queue) {
         if (this._renderQ.length !== 0 && !from_queue) {
             // NB(directxman12): it's technically more performant here to use preallocated arrays,
             // but it's a lot of extra work for not a lot of payoff -- if we're using the render queue,
@@ -489,43 +493,38 @@ Display.prototype = {
         } else {
             this._rgbxImageData(x, y, width, height, arr, offset);
         }
-    },
+    }
 
-    drawImage: function (img, x, y) {
+    drawImage(img, x, y) {
         this._drawCtx.drawImage(img, x, y);
         this._damage(x, y, img.width, img.height);
-    },
+    }
 
-    changeCursor: function (pixels, mask, hotx, hoty, w, h) {
-        Display.changeCursor(this._target, pixels, mask, hotx, hoty, w, h);
-    },
-
-    defaultCursor: function () {
-        this._target.style.cursor = "default";
-    },
-
-    disableLocalCursor: function () {
-        this._target.style.cursor = "none";
-    },
-
-    autoscale: function (containerWidth, containerHeight) {
-        const vp = this._viewportLoc;
-        const targetAspectRatio = containerWidth / containerHeight;
-        const fbAspectRatio = vp.w / vp.h;
-
+    autoscale(containerWidth, containerHeight) {
         let scaleRatio;
-        if (fbAspectRatio >= targetAspectRatio) {
-            scaleRatio = containerWidth / vp.w;
+
+        if (containerWidth === 0 || containerHeight === 0) {
+            scaleRatio = 0;
+
         } else {
-            scaleRatio = containerHeight / vp.h;
+
+            const vp = this._viewportLoc;
+            const targetAspectRatio = containerWidth / containerHeight;
+            const fbAspectRatio = vp.w / vp.h;
+
+            if (fbAspectRatio >= targetAspectRatio) {
+                scaleRatio = containerWidth / vp.w;
+            } else {
+                scaleRatio = containerHeight / vp.h;
+            }
         }
 
         this._rescale(scaleRatio);
-    },
+    }
 
     // ===== PRIVATE METHODS =====
 
-    _rescale: function (factor) {
+    _rescale(factor) {
         this._scale = factor;
         const vp = this._viewportLoc;
 
@@ -533,25 +532,25 @@ Display.prototype = {
         //                   style width to a number, the canvas is cleared.
         //                   However, if you set the style width to a string
         //                   ('NNNpx'), the canvas is scaled without clearing.
-        const width = Math.round(factor * vp.w) + 'px';
-        const height = Math.round(factor * vp.h) + 'px';
+        const width = factor * vp.w + 'px';
+        const height = factor * vp.h + 'px';
 
         if ((this._target.style.width !== width) ||
             (this._target.style.height !== height)) {
             this._target.style.width = width;
             this._target.style.height = height;
         }
-    },
+    }
 
-    _setFillColor: function (color) {
+    _setFillColor(color) {
         const newStyle = 'rgb(' + color[2] + ',' + color[1] + ',' + color[0] + ')';
         if (newStyle !== this._prevDrawStyle) {
             this._drawCtx.fillStyle = newStyle;
             this._prevDrawStyle = newStyle;
         }
-    },
+    }
 
-    _rgbImageData: function (x, y, width, height, arr, offset) {
+    _rgbImageData(x, y, width, height, arr, offset) {
         const img = this._drawCtx.createImageData(width, height);
         const data = img.data;
         for (let i = 0, j = offset; i < width * height * 4; i += 4, j += 3) {
@@ -562,9 +561,9 @@ Display.prototype = {
         }
         this._drawCtx.putImageData(img, x, y);
         this._damage(x, y, img.width, img.height);
-    },
+    }
 
-    _bgrxImageData: function (x, y, width, height, arr, offset) {
+    _bgrxImageData(x, y, width, height, arr, offset) {
         const img = this._drawCtx.createImageData(width, height);
         const data = img.data;
         for (let i = 0, j = offset; i < width * height * 4; i += 4, j += 4) {
@@ -575,12 +574,12 @@ Display.prototype = {
         }
         this._drawCtx.putImageData(img, x, y);
         this._damage(x, y, img.width, img.height);
-    },
+    }
 
-    _rgbxImageData: function (x, y, width, height, arr, offset) {
+    _rgbxImageData(x, y, width, height, arr, offset) {
         // NB(directxman12): arr must be an Type Array view
         let img;
-        if (SUPPORTS_IMAGEDATA_CONSTRUCTOR) {
+        if (supportsImageMetadata) {
             img = new ImageData(new Uint8ClampedArray(arr.buffer, arr.byteOffset, width * height * 4), width, height);
         } else {
             img = this._drawCtx.createImageData(width, height);
@@ -588,25 +587,25 @@ Display.prototype = {
         }
         this._drawCtx.putImageData(img, x, y);
         this._damage(x, y, img.width, img.height);
-    },
+    }
 
-    _renderQ_push: function (action) {
+    _renderQ_push(action) {
         this._renderQ.push(action);
         if (this._renderQ.length === 1) {
             // If this can be rendered immediately it will be, otherwise
             // the scanner will wait for the relevant event
             this._scan_renderQ();
         }
-    },
+    }
 
-    _resume_renderQ: function() {
+    _resume_renderQ() {
         // "this" is the object that is ready, not the
         // display object
         this.removeEventListener('load', this._noVNC_display._resume_renderQ);
         this._noVNC_display._scan_renderQ();
-    },
+    }
 
-    _scan_renderQ: function () {
+    _scan_renderQ() {
         let ready = true;
         while (ready && this._renderQ.length > 0) {
             const a = this._renderQ[0];
@@ -651,45 +650,5 @@ Display.prototype = {
             this._flushing = false;
             this.onflush();
         }
-    },
-};
-
-// Class Methods
-Display.changeCursor = function (target, pixels, mask, hotx, hoty, w, h) {
-    if ((w === 0) || (h === 0)) {
-        target.style.cursor = 'none';
-        return;
     }
-
-    const cur = []
-    for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-            let idx = y * Math.ceil(w / 8) + Math.floor(x / 8);
-            const alpha = (mask[idx] << (x % 8)) & 0x80 ? 255 : 0;
-            idx = ((w * y) + x) * 4;
-            cur.push(pixels[idx + 2]); // red
-            cur.push(pixels[idx + 1]); // green
-            cur.push(pixels[idx]);     // blue
-            cur.push(alpha);           // alpha
-        }
-    }
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-
-    canvas.width = w;
-    canvas.height = h;
-
-    let img;
-    if (SUPPORTS_IMAGEDATA_CONSTRUCTOR) {
-        img = new ImageData(new Uint8ClampedArray(cur), w, h);
-    } else {
-        img = ctx.createImageData(w, h);
-        img.data.set(new Uint8ClampedArray(cur));
-    }
-    ctx.clearRect(0, 0, w, h);
-    ctx.putImageData(img, 0, 0);
-
-    const url = canvas.toDataURL();
-    target.style.cursor = 'url(' + url + ')' + hotx + ' ' + hoty + ', default';
-};
+}
